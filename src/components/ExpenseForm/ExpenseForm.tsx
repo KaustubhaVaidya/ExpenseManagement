@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Upload, X, FileText, Image, File, Loader, CheckCircle } from 'lucide-react';
 import { Expense, Attachment } from '../../types/expense';
 import { expenseCategories } from '../../services/mockData';
-import { apiService } from '../../services/api';
+import { supabaseService } from '../../services/supabase';
 
 interface ExpenseFormProps {
   onSubmit: (expense: Omit<Expense, 'id' | 'submittedAt'>) => Promise<void>;
@@ -82,59 +82,63 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, loading = fa
       return;
     }
 
-    const expenseId = `temp_${Date.now()}`;
-    const processedAttachments: Attachment[] = [];
+    setUploading(true);
 
-    // Process attachments
-    for (const file of attachments) {
-      const attachment: Attachment = {
-        id: `att_${Date.now()}_${Math.random()}`,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        url: URL.createObjectURL(file), // In production, this would be uploaded to storage
-        uploadedAt: new Date().toISOString()
-      };
-      processedAttachments.push(attachment);
+    try {
+      // Create temporary expense ID for file organization
+      const tempExpenseId = `temp_${Date.now()}`;
+      const processedAttachments: Attachment[] = [];
 
-      // Send to ABBYY Vantage for processing
-      if (file.type.includes('pdf') || file.type.includes('image')) {
-        await apiService.sendToAbbyy({
-          expenseId,
-          attachmentId: attachment.id,
-          fileUrl: attachment.url,
-          fileName: file.name,
-          fileType: file.type
-        });
-        attachment.abbyySentAt = new Date().toISOString();
+      // Process attachments - create blob URLs for immediate use
+      // In a real implementation, you'd upload to Supabase Storage
+      for (const file of attachments) {
+        const attachment: Attachment = {
+          id: `att_${Date.now()}_${Math.random()}`,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          url: URL.createObjectURL(file), // Temporary URL for demo
+          uploadedAt: new Date().toISOString()
+        };
+        processedAttachments.push(attachment);
+
+        // Mark for ABBYY processing if it's a document
+        if (file.type.includes('pdf') || file.type.includes('image')) {
+          attachment.abbyySentAt = new Date().toISOString();
+        }
       }
+
+      const expense: Omit<Expense, 'id' | 'submittedAt'> = {
+        title: formData.title,
+        amount: parseFloat(formData.amount),
+        currency: formData.currency,
+        category: formData.category,
+        date: formData.date,
+        description: formData.description,
+        status: 'submitted',
+        submittedBy: 'Current User', // Will be set by the service based on auth
+        attachments: processedAttachments,
+        processingStatus: processedAttachments.length > 0 ? 'pending' : 'completed'
+      };
+
+      await onSubmit(expense);
+
+      // Reset form
+      setFormData({
+        title: '',
+        amount: '',
+        currency: 'USD',
+        category: '',
+        date: new Date().toISOString().split('T')[0],
+        description: ''
+      });
+      setAttachments([]);
+    } catch (error) {
+      console.error('Error submitting expense:', error);
+      alert('Failed to submit expense. Please try again.');
+    } finally {
+      setUploading(false);
     }
-
-    const expense: Omit<Expense, 'id' | 'submittedAt'> = {
-      title: formData.title,
-      amount: parseFloat(formData.amount),
-      currency: formData.currency,
-      category: formData.category,
-      date: formData.date,
-      description: formData.description,
-      status: 'submitted',
-      submittedBy: 'Current User', // In production, get from auth context
-      attachments: processedAttachments,
-      processingStatus: processedAttachments.length > 0 ? 'pending' : 'completed'
-    };
-
-    await onSubmit(expense);
-
-    // Reset form
-    setFormData({
-      title: '',
-      amount: '',
-      currency: 'USD',
-      category: '',
-      date: new Date().toISOString().split('T')[0],
-      description: ''
-    });
-    setAttachments([]);
   };
 
   return (
@@ -318,13 +322,13 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, loading = fa
           <div className="flex justify-end pt-6 border-t border-gray-200">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || uploading}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center space-x-2"
             >
-              {loading ? (
+              {(loading || uploading) ? (
                 <>
                   <Loader className="h-4 w-4 animate-spin" />
-                  <span>Creating Expense...</span>
+                  <span>{uploading ? 'Processing Files...' : 'Creating Expense...'}</span>
                 </>
               ) : (
                 <>

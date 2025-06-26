@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Expense } from '../types/expense';
-import { mockExpenses } from '../services/mockData';
-import { apiService } from '../services/api';
+import { supabaseService } from '../services/supabase';
 
 export const useExpenses = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -15,12 +14,12 @@ export const useExpenses = () => {
   const loadExpenses = async () => {
     try {
       setLoading(true);
-      // For demo purposes, use mock data
-      // In production, this would be: const data = await apiService.getExpenses();
-      setExpenses(mockExpenses);
+      const data = await supabaseService.getExpenses();
+      setExpenses(data);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load expenses');
+      console.error('Error loading expenses:', err);
     } finally {
       setLoading(false);
     }
@@ -28,45 +27,50 @@ export const useExpenses = () => {
 
   const createExpense = async (expenseData: Omit<Expense, 'id' | 'submittedAt'>) => {
     try {
-      const newExpense = {
-        ...expenseData,
-        id: `exp_${Date.now()}`,
-        submittedAt: new Date().toISOString()
-      };
+      const newExpense = await supabaseService.createExpense(expenseData);
       setExpenses(prev => [newExpense, ...prev]);
       return newExpense;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create expense');
-      throw err;
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create expense';
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
   const updateExpense = async (id: string, updates: Partial<Expense>) => {
     try {
-      const updatedExpense = { ...expenses.find(e => e.id === id)!, ...updates };
+      const updatedExpense = await supabaseService.updateExpense(id, updates);
       setExpenses(prev => prev.map(e => e.id === id ? updatedExpense : e));
       return updatedExpense;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update expense');
-      throw err;
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update expense';
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
   const approveExpense = async (id: string, approverId: string) => {
-    return updateExpense(id, {
-      status: 'approved',
-      approvedBy: approverId,
-      approvedAt: new Date().toISOString()
-    });
+    try {
+      const updatedExpense = await supabaseService.approveExpense(id, approverId);
+      setExpenses(prev => prev.map(e => e.id === id ? updatedExpense : e));
+      return updatedExpense;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to approve expense';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
   };
 
   const rejectExpense = async (id: string, rejectedBy: string, reason: string) => {
-    return updateExpense(id, {
-      status: 'rejected',
-      rejectedBy,
-      rejectedAt: new Date().toISOString(),
-      rejectionReason: reason
-    });
+    try {
+      const updatedExpense = await supabaseService.rejectExpense(id, rejectedBy, reason);
+      setExpenses(prev => prev.map(e => e.id === id ? updatedExpense : e));
+      return updatedExpense;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to reject expense';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
   };
 
   return {
