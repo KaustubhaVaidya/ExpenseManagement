@@ -51,12 +51,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
+        
         if (event === 'SIGNED_IN' && session?.user) {
           try {
+            // Add a small delay to ensure database operations are complete
+            await new Promise(resolve => setTimeout(resolve, 500));
             const userData = await supabaseService.getCurrentUser();
             setUser(userData);
           } catch (error) {
-            console.error('Error getting user data:', error);
+            console.error('Error getting user data after sign in:', error);
+            // If we can't get the profile, create a basic user object
+            if (session.user) {
+              const basicUser: User = {
+                id: session.user.id,
+                name: session.user.user_metadata?.name || 'User',
+                email: session.user.email || '',
+                role: session.user.user_metadata?.role || 'employee',
+                department: 'General'
+              };
+              setUser(basicUser);
+            }
           }
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
@@ -75,6 +90,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // User will be set via the auth state change listener
     } catch (error) {
       setLoading(false);
+      console.error('Login error:', error);
       throw error;
     }
   };
@@ -86,6 +102,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(userData);
     } catch (error) {
       setLoading(false);
+      console.error('Signup error:', error);
+      
+      // Provide more user-friendly error messages
+      if (error instanceof Error) {
+        if (error.message.includes('User already registered')) {
+          throw new Error('An account with this email already exists. Please sign in instead.');
+        } else if (error.message.includes('Invalid email')) {
+          throw new Error('Please enter a valid email address.');
+        } else if (error.message.includes('Password')) {
+          throw new Error('Password must be at least 6 characters long.');
+        }
+      }
+      
       throw error;
     }
   };

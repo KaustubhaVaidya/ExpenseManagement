@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, Loader, LogIn, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Loader, LogIn, UserPlus, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface LoginFormProps {
@@ -25,8 +25,42 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isSignup }) 
     setError(''); // Clear error when user types
   };
 
+  const validateForm = () => {
+    if (isSignup && !formData.name.trim()) {
+      setError('Please enter your full name');
+      return false;
+    }
+    
+    if (!formData.email.trim()) {
+      setError('Please enter your email address');
+      return false;
+    }
+    
+    if (!formData.email.includes('@')) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+    
+    if (!formData.password) {
+      setError('Please enter your password');
+      return false;
+    }
+    
+    if (isSignup && formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return false;
+    }
+    
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
     setLoading(true);
     setError('');
 
@@ -37,7 +71,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isSignup }) 
         await login(formData.email, formData.password);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      console.error('Authentication error:', err);
+      setError(err instanceof Error ? err.message : 'Authentication failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -62,8 +97,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isSignup }) 
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            {error}
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-start space-x-2">
+            <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+            <span className="text-sm">{error}</span>
           </div>
         )}
 
@@ -80,7 +116,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isSignup }) 
                 value={formData.name}
                 onChange={handleInputChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                disabled={loading}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Enter your full name"
               />
             </div>
@@ -99,7 +136,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isSignup }) 
                 value={formData.email}
                 onChange={handleInputChange}
                 required
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                disabled={loading}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Enter your email"
               />
             </div>
@@ -118,17 +156,22 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isSignup }) 
                 value={formData.password}
                 onChange={handleInputChange}
                 required
-                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                disabled={loading}
+                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Enter your password"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                disabled={loading}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
               >
                 {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
+            {isSignup && (
+              <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters long</p>
+            )}
           </div>
 
           {isSignup && (
@@ -141,7 +184,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isSignup }) 
                 name="role"
                 value={formData.role}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                disabled={loading}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="employee">Employee</option>
                 <option value="manager">Manager</option>
@@ -173,7 +217,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isSignup }) 
             {isSignup ? 'Already have an account?' : "Don't have an account?"}
             <button
               onClick={onToggleMode}
-              className="ml-2 text-blue-600 hover:text-blue-700 font-medium transition-colors"
+              disabled={loading}
+              className="ml-2 text-blue-600 hover:text-blue-700 font-medium transition-colors disabled:opacity-50"
             >
               {isSignup ? 'Sign In' : 'Sign Up'}
             </button>
